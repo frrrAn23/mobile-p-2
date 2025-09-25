@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'recipe_provider.dart';
 
 void main() {
-  runApp(const FoodieApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => RecipeProvider(),
+      child: const FoodieApp(),
+    ),
+  );
 }
 
 class FoodieApp extends StatelessWidget {
@@ -12,27 +19,37 @@ class FoodieApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Foodie Recipe App',
-      home: const HomePage(),
+      theme: ThemeData(primarySwatch: Colors.orange),
+      home: const RecipePage(),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class RecipePage extends StatelessWidget {
+  const RecipePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    var recipeProvider = Provider.of<RecipeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Foodie Recipe App"),
+        title: const Text("Foodie Recipes"),
         backgroundColor: Colors.deepOrange,
       ),
-      body: const Center(
-        child: Text("Welcome to Foodie!", style: TextStyle(fontSize: 24)),
+      body: ListView.builder(
+        itemCount: recipeProvider.recipes.length,
+        itemBuilder: (context, index) {
+          return ListTile(title: Text(recipeProvider.recipes[index]));
+        },
       ),
-      bottomNavigationBar: const BottomAppBar(
-        child: Center(child: Text("by: Ferdian Khoirul Anam 19232152", style: TextStyle(fontSize: 12)),
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          recipeProvider.addRecipe(
+            "Resep Baru ${recipeProvider.recipes.length + 1}",
+          );
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
