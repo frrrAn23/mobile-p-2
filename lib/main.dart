@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'recipe_provider.dart';
+import 'pages/home/home_page.dart';
 
 void main() {
   runApp(
@@ -19,9 +20,10 @@ class RecipeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Recipe App',
-      theme: ThemeData(primarySwatch: Colors.green),
-      home: const RecipeScreen(),
+      theme: ThemeData(primarySwatch: Colors.orange),
+      home: const HomePage(),
     );
   }
 }
@@ -36,7 +38,10 @@ class RecipeScreen extends StatelessWidget {
     final recipeProvider = Provider.of<RecipeProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Foodie Recipe Apps")),
+      appBar: AppBar(
+        title: const Text("Foodie Recipe Apps"),
+        backgroundColor: Colors.deepOrangeAccent,
+      ),
 
       /// Jika list kosong, tampilkan teks
       body: recipeProvider.recipes.isEmpty
