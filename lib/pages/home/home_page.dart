@@ -1,8 +1,10 @@
+// lib/pages/home/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:foodie_app/models/recipe.dart';
 import 'package:foodie_app/services/recipe_service.dart';
 import 'package:foodie_app/pages/add_recipe_page.dart';
-import 'package:foodie_app/pages/detail_recipe_page.dart'; 
+import 'package:foodie_app/pages/edit_recipe_page.dart';
+import 'package:foodie_app/pages/detail_recipe_page.dart';
 
 enum ViewMode { list, grid }
 
@@ -35,23 +37,104 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (context) => const AddRecipePage()),
     );
 
-    // Jika berhasil menambah resep, refresh data
     if (result == true) {
       _refresh();
     }
   }
 
-  // --- FUNGSI DIPERBAIKI ---
   void _navigateToDetail(Recipe recipe) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        // Menggunakan DetailRecipePage yang benar, bukan _LocalRecipeDetailPage
-        builder: (context) => DetailRecipePage(recipe: recipe),
+      MaterialPageRoute(builder: (context) => DetailRecipePage(recipe: recipe)),
+    );
+  }
+
+  // 📝 FUNGSI EDIT RESEP
+  void _navigateToEdit(Recipe recipe) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditRecipePage(recipe: recipe)),
+    );
+
+    // Jika berhasil update, refresh data
+    if (result == true) {
+      _refresh();
+    }
+  }
+
+  // 🗑️ FUNGSI DELETE DENGAN KONFIRMASI
+  void _confirmDelete(Recipe recipe) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+            const SizedBox(width: 8),
+            const Text('Hapus Resep?'),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus resep "${recipe.title}"?\n\nData yang sudah dihapus tidak dapat dikembalikan.',
+          style: const TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Tutup dialog
+              await _deleteRecipe(recipe);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
       ),
     );
   }
-  // -------------------------
+
+  Future<void> _deleteRecipe(Recipe recipe) async {
+    // Tampilkan loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await RecipeService.deleteRecipe(recipe.id);
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ "${recipe.title}" berhasil dihapus'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        _refresh(); // Refresh data
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Gagal menghapus resep: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +161,6 @@ class _HomePageState extends State<HomePage> {
               });
             },
           ),
-          // --- PopupMenuButton DIHAPUS karena redundan ---
           const SizedBox(width: 8),
         ],
       ),
@@ -148,11 +230,15 @@ class _HomePageState extends State<HomePage> {
                       key: const ValueKey('list'),
                       data: data,
                       onTap: _navigateToDetail,
+                      onEdit: _navigateToEdit,
+                      onDelete: _confirmDelete,
                     )
                   : _RecipeGridView(
                       key: const ValueKey('grid'),
                       data: data,
                       onTap: _navigateToDetail,
+                      onEdit: _navigateToEdit,
+                      onDelete: _confirmDelete,
                     ),
             ),
           );
@@ -172,8 +258,16 @@ class _HomePageState extends State<HomePage> {
 class _RecipeListView extends StatelessWidget {
   final List<Recipe> data;
   final Function(Recipe) onTap;
+  final Function(Recipe) onEdit;
+  final Function(Recipe) onDelete;
 
-  const _RecipeListView({super.key, required this.data, required this.onTap});
+  const _RecipeListView({
+    super.key,
+    required this.data,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +310,25 @@ class _RecipeListView extends StatelessWidget {
                   ),
                 ],
               ),
-              trailing: const Icon(Icons.chevron_right_rounded),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Tombol Edit
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    color: Colors.blue,
+                    tooltip: 'Edit',
+                    onPressed: () => onEdit(r),
+                  ),
+                  // Tombol Delete
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20),
+                    color: Colors.red,
+                    tooltip: 'Hapus',
+                    onPressed: () => onDelete(r),
+                  ),
+                ],
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 8,
@@ -232,8 +344,16 @@ class _RecipeListView extends StatelessWidget {
 class _RecipeGridView extends StatelessWidget {
   final List<Recipe> data;
   final Function(Recipe) onTap;
+  final Function(Recipe) onEdit;
+  final Function(Recipe) onDelete;
 
-  const _RecipeGridView({super.key, required this.data, required this.onTap});
+  const _RecipeGridView({
+    super.key,
+    required this.data,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +380,46 @@ class _RecipeGridView extends StatelessWidget {
               children: [
                 _NetworkImageCover(url: r.imageUrl),
                 const _BottomGradient(),
+
+                // Tombol Edit & Delete di pojok kanan atas
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      // Tombol Edit
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.edit, size: 18),
+                          color: Colors.blue,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                          onPressed: () => onEdit(r),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // Tombol Delete
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.delete, size: 18),
+                          color: Colors.red,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                          onPressed: () => onDelete(r),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 Padding(
                   padding: const EdgeInsets.all(10),
                   child: Column(
@@ -402,7 +562,6 @@ class _BottomGradient extends StatelessWidget {
   }
 }
 
-// --- HANYA SATU DEFINISI _ChipText ---
 class _ChipText extends StatelessWidget {
   final String label;
   const _ChipText({required this.label});
@@ -428,5 +587,3 @@ class _ChipText extends StatelessWidget {
     );
   }
 }
-
-// --- _LocalRecipeDetailPage DIHAPUS ---

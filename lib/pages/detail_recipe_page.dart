@@ -1,3 +1,4 @@
+// lib/pages/detail_recipe_page.dart
 import 'package:flutter/material.dart';
 import 'package:foodie_app/models/recipe.dart';
 

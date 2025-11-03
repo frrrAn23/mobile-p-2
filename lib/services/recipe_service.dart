@@ -1,3 +1,4 @@
+// lib/services/recipe_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:foodie_app/models/recipe.dart';

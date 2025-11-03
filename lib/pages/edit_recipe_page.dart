@@ -1,25 +1,72 @@
-// lib/pages/add_recipe_page.dart
+// lib/pages/edit_recipe_page.dart
 import 'package:flutter/material.dart';
 import 'package:foodie_app/models/recipe.dart';
 import 'package:foodie_app/services/recipe_service.dart';
 
-class AddRecipePage extends StatefulWidget {
-  const AddRecipePage({super.key});
+class EditRecipePage extends StatefulWidget {
+  final Recipe recipe;
+
+  const EditRecipePage({super.key, required this.recipe});
 
   @override
-  State<AddRecipePage> createState() => _AddRecipePageState();
+  State<EditRecipePage> createState() => _EditRecipePageState();
 }
 
-class _AddRecipePageState extends State<AddRecipePage> {
+class _EditRecipePageState extends State<EditRecipePage> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _ingredientsController = TextEditingController();
-  final _stepsController = TextEditingController();
-  final _imageUrlController = TextEditingController();
-  final _timeController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _ingredientsController;
+  late TextEditingController _stepsController;
+  late TextEditingController _imageUrlController;
+  late TextEditingController _timeController;
 
-  String _selectedCategory = "Makanan Berat";
+  // Daftar kategori yang tersedia
+  static const List<String> _availableCategories = [
+    "Makanan Berat",
+    "Cemilan",
+    "Minuman",
+    "Dessert",
+    "Breakfast",
+    "Lunch",
+    "Dinner",
+  ];
+
+  late String _selectedCategory;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inisialisasi controller dengan data resep yang ada
+    _titleController = TextEditingController(text: widget.recipe.title);
+    _ingredientsController = TextEditingController(
+      text: widget.recipe.ingredients,
+    );
+    _stepsController = TextEditingController(text: widget.recipe.steps);
+    _imageUrlController = TextEditingController(text: widget.recipe.imageUrl);
+    _timeController = TextEditingController(text: widget.recipe.cookingTime);
+
+    // Validasi kategori - gunakan kategori dari data jika ada,
+    // jika tidak ada gunakan kategori default
+    if (_availableCategories.contains(widget.recipe.category)) {
+      _selectedCategory = widget.recipe.category;
+    } else {
+      // Jika kategori tidak ada dalam list, gunakan default
+      _selectedCategory = _availableCategories[0];
+      // Tampilkan info ke user bahwa kategori telah diubah
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Kategori "${widget.recipe.category}" tidak tersedia. Diganti ke "${_selectedCategory}"',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -38,8 +85,8 @@ class _AddRecipePageState extends State<AddRecipePage> {
       });
 
       try {
-        Recipe newRecipe = Recipe(
-          id: '', // API akan generate otomatis
+        Recipe updatedRecipe = Recipe(
+          id: widget.recipe.id, // Gunakan ID yang sama
           title: _titleController.text,
           ingredients: _ingredientsController.text,
           steps: _stepsController.text,
@@ -50,26 +97,24 @@ class _AddRecipePageState extends State<AddRecipePage> {
               : _imageUrlController.text,
         );
 
-        await RecipeService.createRecipe(newRecipe);
+        // Panggil API untuk update
+        await RecipeService.updateRecipe(widget.recipe.id, updatedRecipe);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Resep berhasil ditambahkan!'),
+              content: Text('✅ Resep berhasil diperbarui!'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
             ),
           );
-          Navigator.pop(
-            context,
-            true,
-          ); // kembali ke HomePage dengan result true
+          Navigator.pop(context, true); // Kembali dengan result true
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Gagal menambahkan resep: $e'),
+              content: Text('❌ Gagal memperbarui resep: $e'),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 3),
             ),
@@ -89,7 +134,7 @@ class _AddRecipePageState extends State<AddRecipePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tambah Resep Baru"),
+        title: const Text("Edit Resep"),
         backgroundColor: Colors.deepOrangeAccent,
         elevation: 0,
       ),
@@ -100,6 +145,32 @@ class _AddRecipePageState extends State<AddRecipePage> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Info: Data yang sedang diedit
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Anda sedang mengedit: ${widget.recipe.title}',
+                          style: TextStyle(
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 // Judul Resep
                 TextFormField(
                   controller: _titleController,
@@ -131,20 +202,9 @@ class _AddRecipePageState extends State<AddRecipePage> {
                     filled: true,
                     fillColor: Colors.grey.shade50,
                   ),
-                  items:
-                      [
-                            "Makanan Berat",
-                            "Cemilan",
-                            "Minuman",
-                            "Dessert",
-                            "Breakfast",
-                            "Lunch",
-                            "Dinner",
-                          ]
-                          .map(
-                            (e) => DropdownMenuItem(value: e, child: Text(e)),
-                          )
-                          .toList(),
+                  items: _availableCategories
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedCategory = value!;
@@ -228,7 +288,7 @@ class _AddRecipePageState extends State<AddRecipePage> {
                 ),
                 const SizedBox(height: 24),
 
-                // Tombol Simpan
+                // Tombol Update
                 ElevatedButton(
                   onPressed: _isLoading ? null : _submitForm,
                   style: ElevatedButton.styleFrom(
@@ -249,7 +309,7 @@ class _AddRecipePageState extends State<AddRecipePage> {
                           ),
                         )
                       : const Text(
-                          "Simpan Resep",
+                          "💾 Update Resep",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

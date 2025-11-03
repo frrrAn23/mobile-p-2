@@ -1,3 +1,4 @@
+// lib/recipe_provider.dart
 import 'package:flutter/foundation.dart';
 
 /// Model sederhana untuk menyimpan data resep
