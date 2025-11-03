@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:foodie_app/models/recipe.dart';
 import 'package:foodie_app/services/recipe_service.dart';
+import 'package:foodie_app/pages/add_recipe_page.dart';
+import 'package:foodie_app/pages/detail_recipe_page.dart'; 
 
 enum ViewMode { list, grid }
 
@@ -25,8 +27,31 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       futureRecipes = RecipeService.fetchRecipes();
     });
-    // biar FutureBuilder re-run; gak perlu delay di sini.
   }
+
+  void _navigateToAddRecipe() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddRecipePage()),
+    );
+
+    // Jika berhasil menambah resep, refresh data
+    if (result == true) {
+      _refresh();
+    }
+  }
+
+  // --- FUNGSI DIPERBAIKI ---
+  void _navigateToDetail(Recipe recipe) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        // Menggunakan DetailRecipePage yang benar, bukan _LocalRecipeDetailPage
+        builder: (context) => DetailRecipePage(recipe: recipe),
+      ),
+    );
+  }
+  // -------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -53,26 +78,7 @@ class _HomePageState extends State<HomePage> {
               });
             },
           ),
-          PopupMenuButton<ViewMode>(
-            icon: const Icon(Icons.tune_rounded),
-            onSelected: (m) => setState(() => _mode = m),
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: ViewMode.list,
-                child: ListTile(
-                  leading: Icon(Icons.view_list_rounded),
-                  title: Text('List'),
-                ),
-              ),
-              PopupMenuItem(
-                value: ViewMode.grid,
-                child: ListTile(
-                  leading: Icon(Icons.grid_view_rounded),
-                  title: Text('Card/Grid'),
-                ),
-              ),
-            ],
-          ),
+          // --- PopupMenuButton DIHAPUS karena redundan ---
           const SizedBox(width: 8),
         ],
       ),
@@ -81,19 +87,54 @@ class _HomePageState extends State<HomePage> {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Error: ${snapshot.error}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _refresh,
+                    child: const Text("Coba Lagi"),
+                  ),
+                ],
               ),
             );
           }
+
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final data = snapshot.data!;
           if (data.isEmpty) {
-            return const Center(child: Text("Belum ada resep 😶"));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.restaurant_menu,
+                    size: 80,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Belum ada resep 😶",
+                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Tap tombol + untuk menambah resep",
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(
@@ -103,20 +144,36 @@ class _HomePageState extends State<HomePage> {
               switchInCurve: Curves.easeOut,
               switchOutCurve: Curves.easeIn,
               child: _mode == ViewMode.list
-                  ? _RecipeListView(key: const ValueKey('list'), data: data)
-                  : _RecipeGridView(key: const ValueKey('grid'), data: data),
+                  ? _RecipeListView(
+                      key: const ValueKey('list'),
+                      data: data,
+                      onTap: _navigateToDetail,
+                    )
+                  : _RecipeGridView(
+                      key: const ValueKey('grid'),
+                      data: data,
+                      onTap: _navigateToDetail,
+                    ),
             ),
           );
         },
       ),
       backgroundColor: theme.colorScheme.surface,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToAddRecipe,
+        backgroundColor: Colors.deepOrangeAccent,
+        tooltip: "Tambah Resep",
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }
 
 class _RecipeListView extends StatelessWidget {
   final List<Recipe> data;
-  const _RecipeListView({super.key, required this.data});
+  final Function(Recipe) onTap;
+
+  const _RecipeListView({super.key, required this.data, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +189,7 @@ class _RecipeListView extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () {}, // TODO: detail page
+            onTap: () => onTap(r),
             child: ListTile(
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
@@ -142,6 +199,7 @@ class _RecipeListView extends StatelessWidget {
                 r.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Row(
                 children: [
@@ -149,9 +207,12 @@ class _RecipeListView extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Icon(Icons.schedule_rounded, size: 14),
                   const SizedBox(width: 4),
-                  Text(
-                    r.cookingTime,
-                    style: Theme.of(context).textTheme.bodySmall,
+                  Expanded(
+                    child: Text(
+                      r.cookingTime,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -170,7 +231,9 @@ class _RecipeListView extends StatelessWidget {
 
 class _RecipeGridView extends StatelessWidget {
   final List<Recipe> data;
-  const _RecipeGridView({super.key, required this.data});
+  final Function(Recipe) onTap;
+
+  const _RecipeGridView({super.key, required this.data, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +242,7 @@ class _RecipeGridView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: data.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, // responsive simple
+        crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
         childAspectRatio: 3 / 4,
@@ -191,15 +254,12 @@ class _RecipeGridView extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () {}, // TODO: detail page
+            onTap: () => onTap(r),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // hero image
                 _NetworkImageCover(url: r.imageUrl),
-                // gradient overlay
                 const _BottomGradient(),
-                // text overlay
                 Padding(
                   padding: const EdgeInsets.all(10),
                   child: Column(
@@ -228,9 +288,15 @@ class _RecipeGridView extends StatelessWidget {
                             color: Colors.white70,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            r.cookingTime,
-                            style: const TextStyle(color: Colors.white70),
+                          Expanded(
+                            child: Text(
+                              r.cookingTime,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
@@ -336,6 +402,7 @@ class _BottomGradient extends StatelessWidget {
   }
 }
 
+// --- HANYA SATU DEFINISI _ChipText ---
 class _ChipText extends StatelessWidget {
   final String label;
   const _ChipText({required this.label});
@@ -361,3 +428,5 @@ class _ChipText extends StatelessWidget {
     );
   }
 }
+
+// --- _LocalRecipeDetailPage DIHAPUS ---
